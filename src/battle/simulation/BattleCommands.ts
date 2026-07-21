@@ -56,6 +56,8 @@ export function moveUnit(state: BattleState, unitId: string, targetHex: HexCoord
   if (!canUnitAct(state, unitId)) return commandRejected('This unit cannot act right now');
 
   const unit = state.units.get(unitId)!;
+  if (unit.hasMoved) return commandRejected('This unit has already moved this turn');
+
   const isPassable = (h: HexCoordinate) => state.grid.isInBounds(h) && !isOccupied(state, h, unitId);
 
   const result = findPath(unit.currentHex, targetHex, getNeighbors, () => 1, isPassable);
@@ -65,6 +67,7 @@ export function moveUnit(state: BattleState, unitId: string, targetHex: HexCoord
   if (stepsNeeded > prototypeConfig.defaultUnitMovementRange) return commandRejected('Target is out of movement range');
 
   unit.currentHex = targetHex;
+  unit.hasMoved = true;
   return commandOk(state, [{ type: 'UnitMoved', unitId, to: targetHex }]);
 }
 
@@ -79,10 +82,12 @@ export function attackUnit(
   const attacker = state.units.get(attackerId);
   const defender = state.units.get(defenderId);
   if (!attacker || !defender) return commandRejected('Unknown unit');
+  if (attacker.hasAttacked) return commandRejected('This unit has already attacked this turn');
   if (!defender.alive) return commandRejected('Target is already down');
   if (defender.teamId === attacker.teamId) return commandRejected('Cannot attack your own team');
   if (getDistance(attacker.currentHex, defender.currentHex) !== 1) return commandRejected('Target is not adjacent');
 
+  attacker.hasAttacked = true;
   const damage = resolveMeleeDamage(attacker, defender);
   defender.health = Math.max(0, defender.health - damage);
 
@@ -144,7 +149,11 @@ function startNewRoundIfNeeded(state: BattleState, wrapped: boolean, events: Bat
   if (!wrapped) return;
   state.round += 1;
   for (const unit of state.units.values()) {
-    if (unit.alive) unit.canAct = true;
+    if (unit.alive) {
+      unit.canAct = true;
+      unit.hasMoved = false;
+      unit.hasAttacked = false;
+    }
   }
   events.push({ type: 'RoundStarted', round: state.round });
 }

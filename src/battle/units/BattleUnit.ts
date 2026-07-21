@@ -15,6 +15,9 @@ export interface BattleUnit {
   fatigue: number;
   alive: boolean;
   canAct: boolean;
+  /** Whether this unit has already used its one move / one attack this activation. Reset each round. */
+  hasMoved: boolean;
+  hasAttacked: boolean;
 }
 
 export interface CreateBattleUnitOptions {
@@ -44,5 +47,7 @@ export function createBattleUnit(options: CreateBattleUnitOptions): BattleUnit {
     fatigue: 0,
     alive: true,
     canAct: true,
+    hasMoved: false,
+    hasAttacked: false,
   };
 }

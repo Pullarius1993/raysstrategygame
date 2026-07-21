@@ -73,6 +73,52 @@ describe('individual initiative battle', () => {
     expect(state.winnerTeamId).toBe('red');
   });
 
+  it('limits a unit to a single move per activation', () => {
+    const grid = new BattleGrid(6);
+    const a = unit('a', 'red', 'cap-a', hex(0, 0), { initiative: 10 });
+    const b = unit('b', 'blue', 'cap-b', hex(5, 0), { initiative: 1 });
+    const state = createBattleState({ grid, units: [a, b], scopeTag: 'Skirmish' });
+
+    const firstMove = moveUnit(state, 'a', hex(0, -1));
+    expect(firstMove.ok).toBe(true);
+
+    const secondMove = moveUnit(state, 'a', hex(0, -2));
+    expect(secondMove.ok).toBe(false);
+    expect(a.currentHex).toEqual(hex(0, -1));
+  });
+
+  it('limits a unit to a single attack per activation', () => {
+    const grid = new BattleGrid(6);
+    const a = unit('a', 'red', 'cap-a', hex(0, 0), { initiative: 10, attack: 1 });
+    const b = unit('b', 'blue', 'cap-b', hex(1, 0), { initiative: 1, health: 100, armor: 0 });
+    const state = createBattleState({ grid, units: [a, b], scopeTag: 'Skirmish' });
+
+    const firstAttack = attackUnit(state, 'a', 'b');
+    expect(firstAttack.ok).toBe(true);
+
+    const secondAttack = attackUnit(state, 'a', 'b');
+    expect(secondAttack.ok).toBe(false);
+    expect(b.health).toBe(99);
+  });
+
+  it('refreshes move/attack allowance on the next round', () => {
+    const grid = new BattleGrid(6);
+    const a = unit('a', 'red', 'cap-a', hex(0, 0), { initiative: 10, attack: 1 });
+    const b = unit('b', 'blue', 'cap-b', hex(1, 0), { initiative: 1, health: 100, armor: 0 });
+    const state = createBattleState({ grid, units: [a, b], scopeTag: 'Skirmish' });
+
+    attackUnit(state, 'a', 'b');
+    expect(attackUnit(state, 'a', 'b').ok).toBe(false);
+
+    endUnitTurn(state, 'a');
+    endUnitTurn(state, 'b');
+    expect(state.round).toBe(2);
+    expect(a.hasAttacked).toBe(false);
+    expect(a.hasMoved).toBe(false);
+
+    expect(attackUnit(state, 'a', 'b').ok).toBe(true);
+  });
+
   it('advances rounds after every unit has ended their turn', () => {
     const grid = new BattleGrid(6);
     const a = unit('a', 'red', 'cap-a', hex(0, 0), { initiative: 10 });
@@ -111,5 +157,24 @@ describe('captain activation battle', () => {
     expect(state.units.get('a1')!.canAct).toBe(false);
     expect(state.units.get('a2')!.canAct).toBe(false);
     expect(state.initiativeOrder[state.activeIndex]).toBe('cap-blue');
+  });
+
+  it('still caps each individual unit to one move even while its captain is active', () => {
+    const grid = new BattleGrid(10);
+    const units = [
+      unit('a1', 'red', 'cap-red', hex(0, 0), { initiative: 10 }),
+      unit('a2', 'red', 'cap-red', hex(0, 5), { initiative: 9 }),
+      unit('b1', 'blue', 'cap-blue', hex(5, 0), { initiative: 1 }),
+    ];
+    const state = createBattleState({ grid, units, scopeTag: 'SiegeAssault' });
+
+    const firstMove = moveUnit(state, 'a1', hex(1, 0));
+    expect(firstMove.ok).toBe(true);
+    const secondMove = moveUnit(state, 'a1', hex(2, 0));
+    expect(secondMove.ok).toBe(false);
+
+    // A different unit under the same active captain can still act.
+    const otherUnitMove = moveUnit(state, 'a2', hex(1, 5));
+    expect(otherUnitMove.ok).toBe(true);
   });
 });
