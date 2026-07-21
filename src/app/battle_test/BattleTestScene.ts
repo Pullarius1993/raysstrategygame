@@ -69,12 +69,17 @@ export class BattleTestScene implements Scene {
     this.endTurnButton?.addEventListener('click', () => this.handleEndTurn());
     this.restartButton?.addEventListener('click', () => this.handleRestart());
 
-    void this.initPixi(root);
+    this.initPixi(root).catch((error: unknown) => {
+      console.error('BattleTestScene failed to initialize renderer', error);
+      if (this.statusEl) {
+        this.statusEl.textContent = `Renderer error: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    });
   }
 
   private async initPixi(root: HTMLElement): Promise<void> {
     const app = new Application();
-    await app.init({ resizeTo: root, backgroundColor: 0x0d1420, antialias: true });
+    await app.init({ resizeTo: root, backgroundColor: 0x0d1420, antialias: true, preference: ['webgl', 'canvas'] });
     if (this.destroyed) {
       app.destroy(true);
       return;
